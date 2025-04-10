@@ -4,7 +4,7 @@ import re
 tickets = pd.read_csv("parking-tickets.csv", sep=';', engine='python', on_bad_lines='skip')
 tickets['EntryDate'] = pd.to_datetime(tickets['EntryDate'], errors='coerce')
 tickets = tickets[tickets['EntryDate'].notnull()]
-tickets = tickets[tickets['EntryDate'].dt.year == 2023]
+tickets = tickets[(tickets['EntryDate'].dt.month == 7) & (tickets['EntryDate'].dt.year == 2023)]
 tickets['hour'] = tickets['EntryDate'].dt.hour
 tickets['dayofweek'] = tickets['EntryDate'].dt.dayofweek
 with open("parking-meters.csv", "r", encoding="utf-8", errors="ignore") as f:
