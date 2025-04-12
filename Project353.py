@@ -57,7 +57,8 @@ def tickets_preproc(tickets: pd.DataFrame) -> gpd.GeoDataFrame:
 
     tickets['EntryDate'] = pd.to_datetime(tickets['EntryDate'], errors='coerce')
     tickets = tickets[tickets['EntryDate'].notnull()]
-    tickets = tickets[(tickets['EntryDate'].dt.month == 7) & (tickets['EntryDate'].dt.year == 2023)]
+    tickets = tickets[(tickets['EntryDate'].dt.year == 2023)] # temporary filter
+    tickets["month"] = tickets["EntryDate"].dt.month
     tickets['dayofweek'] = tickets['EntryDate'].dt.dayofweek
 
     
