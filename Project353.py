@@ -37,13 +37,27 @@ def tickets_preproc(tickets: pd.DataFrame) -> gpd.GeoDataFrame:
         gpd.GeoDataFrame: Cleaned and transformed tickets data.
     """
     print("Performing pre-processing on tickets")
-    
+   
+    meter_infraction_text = [
+        'PARK IN A METERED SPACE IF THE TIME RECORDED BY THE OPERATOR UNDER THE PAY BY PHONE OR PAY BY LICENCE PLATE OPTION HAS EXPIRED',
+        'PARK IN A METERED SPACE IF THE PARKING METER HEAD DISPLAYS FOUR FLASHING ZEROS IN A WINDOW',
+        'PARK IN A METERED SPACE IF THE TIME RECORDED BY THE OPERATOR UNDER THE PAY BY PHONE OR PAY BY LICENCE PLATE OPTION HAS EXPIRED..',
+        'VEHICLE LEFT IN A METERED SPACE FOR A PERIOD LONGER THAN THE TIME LIMIT IN HOURS THAT IS SHOWN ON THE PARKING METER HEAD OR RECORDED UNDER THE PAY BY PHONE OR PAY BY LICENCE PLATE OPTION',
+        'A PERSON MUST PARK A VEHICLE ENTIRELY WITHIN A METERED SPACE AS DEFINED IN SECTION 2(2)',
+        'PARK IN A METERED SPACE IF THE PARKING METER HEAD DISPLAYS FOUR FLASHING ZEROS IN A WINDOW..',
+        'PARK IN A METERED SPACE IF THE PARKING METER HEAD DISPLAYS A "FAIL" TEXT IN A WINDOW',
+        'IN METERED SPACES PARALLEL TO THE CLOSEST CURB OR SIDEWALK, A PERSON MUST PARK A VEHICLE PARALLEL TO THE CURB OR SIDEWALK, EXCEPT MOTORCYCLES OR MOTOR ASSISTED VEHICLES CAN PARK AT AN ANGLE',
+        'PARK IN A METERED SPACE IF THE PARKING METER HEAD DISPLAYS FOUR FLASHING ZEROS IN A WINDOW.',
+        'PARK IN A METERED SPACE IF THE PARKING METER HEAD DISPLAYS AN "OUT OF ORDER" TEXT IN A WINDOW',
+        'PARK IN A METERED SPACE IF THE TIME RECORDED BY THE OPERATOR UNDER THE PAY BY PHONE OR PAY BY LICENCE PLATE OPTION HAS EXPIRED.',
+    ]
+   
+    tickets = tickets[~tickets["InfractionText"].isin(meter_infraction_text)] 
     tickets = tickets.drop(["Bylaw", "Section", "InfractionText"], axis=1)
 
     tickets['EntryDate'] = pd.to_datetime(tickets['EntryDate'], errors='coerce')
     tickets = tickets[tickets['EntryDate'].notnull()]
     tickets = tickets[(tickets['EntryDate'].dt.month == 7) & (tickets['EntryDate'].dt.year == 2023)]
-    tickets['hour'] = tickets['EntryDate'].dt.hour
     tickets['dayofweek'] = tickets['EntryDate'].dt.dayofweek
 
     
