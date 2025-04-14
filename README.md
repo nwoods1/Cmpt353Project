@@ -1,56 +1,20 @@
 # Cmpt353Project
 
-Required Libraries: 
-pandas	Data manipulation and loading CSV files
-geopandas	Working with geographic (geometry) data and spatial joins
-shapely	Handling geometric objects (e.g., Point, Polygon)
-scikit-learn	Machine learning models (e.g., RandomForestClassifier, train_test_split)
-matplotlib	Plotting visualizations
-seaborn	Enhanced plotting (e.g., heatmaps, bar charts)
-numpy	Array operations and numerical calculations
-geopy	Geocoding block and street names into lat/lon coordinates
+## Dependencies:
+* `Python3`: Tested on 3.11 
+* `geopandas`: Working with geographic data and spatial joins
+* `geopy`: Geocoding block and street names into lat/lon coordinates
+* `matplotlib`: Plotting visualizations
+* `panda`: Data manipulation and loading CSV files
+* `numpy`: Array operations and numerical calculations
+* `scikit-learn`" Machine learning models 
+* `scipy`: Statistical testing
+* `shapely`: Handling geometric objects
 
-Input files needed:
-parking_tickets.csv
+## Visualizations
+* File: [notebooks/2_visualizations.ipynb](https://github.com/nwoods1/Cmpt353Project/blob/main/notebooks/2_visualizations.ipynb)
+* Generates informative and illustrative figures of the cleaned data
 
-parking_meters.csv
-
-block_street_with_lat_lon.csv
-
-cached_block_street_with_lat_lon.csv
-
-local_area_boundaries.csv
-
-Step 1: Visualizations
-File: notebooks/2_visualizations.ipynb
-
-Generates Figures 1–7 in the report
-
-Helps identify Downtown as a high-activity ticket zone
-
-Produces:
-
-Neighborhood outlines
-
-Ticket count maps and heatmaps
-
-Step 2: Modeling
-File: notebooks/3_model.ipynb
-
-Trains a RandomForest model using Positive-Unlabeled (PU) Learning
-
-Performs:
-
-Spatial join with meters
-
-Date simulation for unlabeled events
-
-Reliable negative generation via probability thresholding
-
-Final model training and evaluation
-
-Produces:
-
-Classification report
-
-Accuracy score
+## Modeling and Analysis
+* File: [notebooks/3_model.ipynb](https://github.com/nwoods1/Cmpt353Project/blob/main/notebooks/3_model.ipynb)
+* Performs the work outlined in the final report
