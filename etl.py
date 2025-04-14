@@ -1,25 +1,60 @@
+"""
+Perform ETL on the dataset found in ~/data/raw/data.
+
+CMPT 353: Spring 2025 Final project.
+"""
+
+from __future__ import annotations
+
 import json
 import os
-from typing import Tuple
+import re
 
 import geopandas as gpd
 import pandas as pd
-import re
 from shapely.geometry import Polygon, Point
 
 
 RAW_DATA_PATH = "data/raw_data"
 CLEANED_DATA_PATH = "data/cleaned_data"
 
+
 def read_csv(file_name: str, sep:str =";") -> pd.DataFrame:
+    """
+    Read from a csv and output a pandas dataframe
+
+    Args:
+        file_name (str): File path to csv.
+        sep (str, optional): Separator in the csv. Defaults to ";".
+
+    Returns:
+        pd.DataFrame: Parsed csv file as a dataframe.
+    """
     return pd.read_csv(file_name, sep=sep, engine="python", on_bad_lines="skip")
 
 
-def to_csv(df: gpd.GeoDataFrame, name: str) -> None:
+def to_csv(df: pd.DataFrame, name: str) -> None:
+    """
+    Write dataframe out to a csv file.
+
+    Args:
+        df (pd.DataFrame): Dataframe to be written out.
+        name (str): Name of the file to write out to.
+    """
     df.to_csv(f"{CLEANED_DATA_PATH}/{name}", index=False)
 
 
 def df_to_gdf(df: pd.DataFrame, geometry_key: str) -> gpd.GeoDataFrame:
+    """
+    Convert a pandas dataframe to a geopandas geodataframe.
+
+    Args:
+        df (pd.DataFrame): pandas dataframe to be converted.
+        geometry_key (str): Column name of the geometry data.
+
+    Returns:
+        gpd.GeoDataFrame: Converted pandas dataframe.
+    """
     return gpd.GeoDataFrame(df, geometry=geometry_key)
 
 
@@ -38,7 +73,7 @@ def tickets_preproc(tickets: pd.DataFrame) -> gpd.GeoDataFrame:
     """
     print("Performing pre-processing on tickets")
    
-    target_bylaws = [2952] # parking-meter related
+    target_bylaws = [2952] # parking-meter related bylaw
     target_sections = [
         # PARK IN A METERED SPACE IF THE TIME RECORDED BY THE OPERATOR UNDER 
         # THE PAY BY PHONE OR PAY BY LICENCE PLATE OPTION HAS EXPIRED
@@ -63,12 +98,11 @@ def tickets_preproc(tickets: pd.DataFrame) -> gpd.GeoDataFrame:
         axis=1
     )
 
+    # clean up the entry date
     tickets['EntryDate'] = pd.to_datetime(tickets['EntryDate'], errors='coerce')
-
     tickets = tickets[tickets['EntryDate'].notnull()]
     tickets["dayofweek"] = tickets['EntryDate'].dt.dayofweek
 
-    
     # add latitude and longitude to tickets df
     block_street_with_lat_lon = read_csv(f"{CLEANED_DATA_PATH}/block_street_with_lat_lon.csv", sep=",")
     
@@ -122,7 +156,10 @@ def meters_preproc() -> gpd.GeoDataFrame:
         "METERHEAD", "CREDITCARD", "Geom", "Geo Local Area", "METERID"
     }
     meters = meters.drop(headers - headers_to_keep, axis=1)
+
+    # convert credit card values to boolean int
     meters["CREDITCARD"] = meters["CREDITCARD"].replace({"Yes": 1, "No": 0})
+    
     
     def extract_coordinates(geom_str):
         match = re.search(r'\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]', str(geom_str))
@@ -130,12 +167,12 @@ def meters_preproc() -> gpd.GeoDataFrame:
             return float(match.group(1)), float(match.group(2))
         return None, None
 
+
     meters["lon"], meters["lat"] = zip(*meters['Geom'].apply(extract_coordinates))
     meters = meters[meters["lon"].notnull() & meters["lat"].notnull()]    
     meters["Geometry"] = meters.apply(lambda row: Point(row["lat"], row["lon"]), axis=1)
     
-    meters = meters.drop(["Geom", "lat", "lon"], axis=1)
-    
+    meters = meters.drop(["Geom", "lat", "lon"], axis=1)    
     return df_to_gdf(meters, "Geometry")
     
 
@@ -155,11 +192,13 @@ def boundaries_preproc(boundaries_df: pd.DataFrame) -> gpd.GeoDataFrame:
     print("performing pre-processing on boundaries")
     boundaries_df = boundaries_df.drop("geo_point_2d", axis=1)
     
+    # prepare the dataframe to be converted into a geodataframe
     def to_linestring(area) -> Polygon:
         area = json.loads(area)    
         coords = area["coordinates"][0]
         flipped = [(lat, lon) for lon, lat in coords]
         return Polygon(flipped)
+
 
     boundaries_df["Geom"] = boundaries_df["Geom"].apply(to_linestring)
     boundaries_df.rename(
@@ -188,11 +227,10 @@ def add_geo_local_area_to_tickets(
 
     joined_gdf = gpd.sjoin(tickets_df, boundaries_df, how="left", predicate="within")
     joined_gdf = joined_gdf.drop(columns=["index_right"])
-    
     return joined_gdf
 
 
-def etl() -> Tuple[gpd.GeoDataFrame]:
+def etl() -> None:
     """
     Perform ETL on raw ticket, meter and Vancouver boundary data.
     """
@@ -217,12 +255,6 @@ def etl() -> Tuple[gpd.GeoDataFrame]:
     to_csv(meters_df, "parking_meters.csv")
     to_csv(boundaries_df, "local_area_boundaries.csv")
     
-    return tickets_df, meters_df, boundaries_df
-    
-
-def main() -> None:
-    tickets_df, meters_df, boundaries_df = etl()
-
 
 if __name__ == "__main__":
-    main()    
+    etl()    
