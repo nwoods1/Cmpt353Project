@@ -5,7 +5,7 @@ from typing import Tuple
 import geopandas as gpd
 import pandas as pd
 import re
-from shapely.geometry import LineString, Polygon, Point
+from shapely.geometry import Polygon, Point
 
 
 RAW_DATA_PATH = "data/raw_data"
@@ -38,30 +38,35 @@ def tickets_preproc(tickets: pd.DataFrame) -> gpd.GeoDataFrame:
     """
     print("Performing pre-processing on tickets")
    
-    meter_infraction_text = [
-        'PARK IN A METERED SPACE IF THE TIME RECORDED BY THE OPERATOR UNDER THE PAY BY PHONE OR PAY BY LICENCE PLATE OPTION HAS EXPIRED',
-        'PARK IN A METERED SPACE IF THE PARKING METER HEAD DISPLAYS FOUR FLASHING ZEROS IN A WINDOW',
-        'PARK IN A METERED SPACE IF THE TIME RECORDED BY THE OPERATOR UNDER THE PAY BY PHONE OR PAY BY LICENCE PLATE OPTION HAS EXPIRED..',
-        'PARK IN A METERED SPACE IF THE PARKING METER HEAD DISPLAYS FOUR FLASHING ZEROS IN A WINDOW..',
-        'PARK IN A METERED SPACE IF THE PARKING METER HEAD DISPLAYS FOUR FLASHING ZEROS IN A WINDOW.',
-        'PARK IN A METERED SPACE IF THE TIME RECORDED BY THE OPERATOR UNDER THE PAY BY PHONE OR PAY BY LICENCE PLATE OPTION HAS EXPIRED.',
+    target_bylaws = [2952] # parking-meter related
+    target_sections = [
+        # PARK IN A METERED SPACE IF THE TIME RECORDED BY THE OPERATOR UNDER 
+        # THE PAY BY PHONE OR PAY BY LICENCE PLATE OPTION HAS EXPIRED
+        "5(4)(A)(ii)",
+        "5(4)(a)(ii)",
         
-        # parking ticket related, but not towards paying for parking
-        # 'VEHICLE LEFT IN A METERED SPACE FOR A PERIOD LONGER THAN THE TIME LIMIT IN HOURS THAT IS SHOWN ON THE PARKING METER HEAD OR RECORDED UNDER THE PAY BY PHONE OR PAY BY LICENCE PLATE OPTION',
-        # 'A PERSON MUST PARK A VEHICLE ENTIRELY WITHIN A METERED SPACE AS DEFINED IN SECTION 2(2)',
-        # 'PARK IN A METERED SPACE IF THE PARKING METER HEAD DISPLAYS A "FAIL" TEXT IN A WINDOW',
-        # 'PARK IN A METERED SPACE IF THE PARKING METER HEAD DISPLAYS AN "OUT OF ORDER" TEXT IN A WINDOW',
-        # 'IN METERED SPACES PARALLEL TO THE CLOSEST CURB OR SIDEWALK, A PERSON MUST PARK A VEHICLE PARALLEL TO THE CURB OR SIDEWALK, EXCEPT MOTORCYCLES OR MOTOR ASSISTED VEHICLES CAN PARK AT AN ANGLE',
+        # PARK IN A METERED SPACE IF THE PARKING METER HEAD DISPLAYS FOUR 
+        # FLASHING ZEROS IN A WINDOW
+        "5(4)(B)",
+        "5(4)(b)"
     ]
+    target_status = ["IS"] # ticket issued
    
-    tickets = tickets[~tickets["InfractionText"].isin(meter_infraction_text)] 
-    tickets = tickets.drop(["Bylaw", "Section", "InfractionText"], axis=1)
+    tickets = tickets[
+        (tickets["Bylaw"].isin(target_bylaws)) 
+        & (tickets["Section"].isin(target_sections)) 
+        & (tickets["Status"].isin(target_status))
+    ]     
+    
+    tickets = tickets.drop(
+        ["Bylaw", "Section", "InfractionText", "Status", "BI_ID"], 
+        axis=1
+    )
 
     tickets['EntryDate'] = pd.to_datetime(tickets['EntryDate'], errors='coerce')
+
     tickets = tickets[tickets['EntryDate'].notnull()]
-    tickets = tickets[(tickets['EntryDate'].dt.year == 2023)] # temporary filter
-    tickets["month"] = tickets["EntryDate"].dt.month
-    tickets['dayofweek'] = tickets['EntryDate'].dt.dayofweek
+    tickets["dayofweek"] = tickets['EntryDate'].dt.dayofweek
 
     
     # add latitude and longitude to tickets df
@@ -90,24 +95,34 @@ def meters_preproc() -> gpd.GeoDataFrame:
         gpd.GeoDataFrame: Cleaned and transformed meter data
     """
     print("performing pre-processing on meters")
-    with open(f"{RAW_DATA_PATH}/parking-meters.csv", "r", encoding="utf-8", errors="ignore") as f:
+
+    # read and extract
+    with open(
+        f"{RAW_DATA_PATH}/parking-meters.csv", 
+        "r", 
+        encoding="utf-8", 
+        errors="ignore"
+    ) as f:
         lines = f.readlines()
 
     rows = [line.strip().split(";") for line in lines]
     meters = pd.DataFrame(rows[1:], columns=rows[0])  
 
     headers = [
-        "METERHEAD", "R_MF_9A_6P", "R_MF_6P_10", "R_SA_9A_6P", "R_SA_6P_10", "R_SU_9A_6P", 
-        "R_SU_6P_10", "RATE_MISC", "TIMEINEFFE", "T_MF_9A_6P", "T_MF_6P_10", "T_SA_9A_6P", 
-        "T_SA_6P_10", "T_SU_9A_6P", "T_SU_6P_10", "TIME_MISC", "CREDITCARD", "PAY_PHONE", 
-        "Geom", "Geo Local Area", "METERID", "geo_point_2d"
+        "METERHEAD", "R_MF_9A_6P", "R_MF_6P_10", "R_SA_9A_6P", "R_SA_6P_10", 
+        "R_SU_9A_6P", "R_SU_6P_10", "RATE_MISC", "TIMEINEFFE", "T_MF_9A_6P", 
+        "T_MF_6P_10", "T_SA_9A_6P", "T_SA_6P_10", "T_SU_9A_6P", "T_SU_6P_10", 
+        "TIME_MISC", "CREDITCARD", "PAY_PHONE", "Geom", "Geo Local Area", 
+        "METERID", "geo_point_2d"
     ]
 
-    meters.columns = headers
-    
+    meters.columns = headers        
     headers = set(headers)
-    headers_to_keep = {"METERHEAD", "TIMEINEFFE", "Geom", "Geo Local Area", "METERID"}
+    headers_to_keep = {
+        "METERHEAD", "CREDITCARD", "Geom", "Geo Local Area", "METERID"
+    }
     meters = meters.drop(headers - headers_to_keep, axis=1)
+    meters["CREDITCARD"] = meters["CREDITCARD"].replace({"Yes": 1, "No": 0})
     
     def extract_coordinates(geom_str):
         match = re.search(r'\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]', str(geom_str))
@@ -115,8 +130,8 @@ def meters_preproc() -> gpd.GeoDataFrame:
             return float(match.group(1)), float(match.group(2))
         return None, None
 
-    meters['lon'], meters['lat'] = zip(*meters['Geom'].apply(extract_coordinates))
-    meters = meters[meters['lon'].notnull() & meters['lat'].notnull()]    
+    meters["lon"], meters["lat"] = zip(*meters['Geom'].apply(extract_coordinates))
+    meters = meters[meters["lon"].notnull() & meters["lat"].notnull()]    
     meters["Geometry"] = meters.apply(lambda row: Point(row["lat"], row["lon"]), axis=1)
     
     meters = meters.drop(["Geom", "lat", "lon"], axis=1)
